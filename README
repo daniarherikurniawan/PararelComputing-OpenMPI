@@ -1,0 +1,98 @@
+Readme
+
+Cara menjalankan dan memanage program ini ada bermacam-macam. Berikut adalah salah satu alternatif cara :
+1. Download Bitvise sesuai OS anda kemudian install
+2. Masukkan alamat host : 167.205.32.46
+3. Masukkan username : sister_13512064_2
+4. Masukkan password: tharsis
+5. Masukkan port : 22
+5. Klik login
+6. Akan muncul dua jendela baru, yang pertama adalah UI untuk memindahkan file dengan mekanisme upload-download. Kemudian yang kedua adalah terminal untuk mengakses host yang kita tuju.
+7. Berdasarkan pengalaman saya, jangan gunakan terminal dari Bitvise. Gunakan Bitvise untuk mempermudah proses pemindahan file dari localhost ke host yang dituju.
+8. Kemudian kita buka program lain yang akan bermanfaat, yaitu Git Bash
+9. Kita akan login ssh dari Git Bash dengan perintah : ssh sister_13512064_2@167.205.32.46
+10. Kemudian ketika ditanya password , masukkan : tharsis
+11. Anda bisa check folder di remoted host dengan : ls -a , untuk mengingatkan apa saja yang ada di sana.
+12. lakukan setting seperti yang ada di soal :
+	- Login dengan ssh ke 167.205.32.46, username sister_<NIM anda>, password “tharsis”. Buat pasangan public/private key untuk ssh (kosongkan semua jawaban pertanyaan)
+		$ ssh-keygen -t dsa
+		$ chmod 700 /home/<username>/.ssh
+	- Pada 167.205.32.47 dan 167.205.32.48, buatlah sebuah folder ".ssh" dengan perintah
+		$ mkdir .ssh
+	- Pada 167.205.32.46, lakukan pengkopian public key dengan perintah
+		$ scp /home/<username>/.ssh/id_dsa.pub <username>@167.205.32.47:.ssh/authorized_keys
+		$ scp /home/<username>/.ssh/id_dsa.pub <username>@167.205.32.48:.ssh/authorized_keys
+	- Lakukan ujicoba koneksi dari 167.205.32.46 dengan perintah
+		$ ssh 167.205.32.47
+		$ logout
+		$ ssh 167.205.32.48
+		$ logout
+	- Agar tidak perlu memasukkan password setiap login ke komputer lain, pada 167.205.32.46, lakukan perintah
+		$ eval `ssh-agent`
+		$ ssh-add ~/.ssh/id_dsa
+	- Konfigurasi PATH
+		Pada 167.205.32.46, 167.205.32.47, dan 167.205.32.48, lakukan konfigurasi path dengan langkah berikut ini:
+		$ nano ~/.bashrc
+		Tambahkan 3 baris dibawah ini pada bagian paling bawah dan simpan file tersebut:
+			PATH=/opt/openmpi/bin:/opt/openmpi/bin/:$PATH
+			export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/openmpi/lib
+			export PATH
+
+13. Buat hellompi.c dan mpi_hostfile
+
+	- mpi_hostfile:
+		# file daftar host untuk MPI
+		Localhost
+		167.205.32.47
+		167.205.32.48
+
+	- hellompi.c:
+		#include "mpi.h"
+		#include <stdio.h>
+		int main(int argc,char *argv[]) {
+			int numtasks, rank;
+			char processor_name[MPI_MAX_PROCESSOR_NAME];
+			int name_len;
+			MPI_Status Stat;
+			MPI_Init(&argc,&argv);
+			MPI_Comm_size(MPI_COMM_WORLD, &numtasks);
+			MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+			MPI_Get_processor_name(processor_name, &name_len);
+			printf("Hello from processor %s, task %d of %d, \n",
+			processor_name, rank, numtasks);
+			MPI_Finalize();
+		}
+
+14. Kompilasi dan Run
+	Lakukan kompilasi pada 167.205.32.46 dengan perintah
+	$ mpicc <nama-program> -o <nama-executable>
+	misal: mpicc hellompi.c –o hellompi
+
+	Pindahkan hasil kompilasi ke 167.205.32.47 dan 167.205.32.48 dengan perintah
+	$ scp <nama-executable> <username>@167.205.32.47:<nama-executable>
+	$ scp <nama-executable> <username>@167.205.32.48:<nama-executable>
+	
+	Jalankan program dengan perintah (NP: jumlah proses)
+	$ mpirun -np <jumlah-proses> --hostfile mpi_hostfile <nama-executable>
+	
+	Apabila terdapat permasalahan untuk jumlah NP yang besar, lakukan eksekusi dengan perintah
+	$ mpirun -np <jumlah-proses> --hostfile mpi_hostfile --bind-to core:overload-allowed <nama-executable>
+
+15. Sekarang mulai menjalankan program matrix dengan mengenerate file terlebih dahulu.
+16. Untuk mengenerate file, jalankan program matrix_generator.c dengan : ./matrix_generator
+17. kemudian buat semua file yang akan digunakan untuk kasus uji, yaitu matriks ukuran 4, 64, 128, 256, 512, dan 1024.
+18. Sekarang kita bisa mengkompilasi calculate_matrix.c dengan perintah: mpicc  calculate_matrix.c  -o calculate_matrix
+19. Kemudian mendistribusikan hasil kompilasinya ke hostfile, dengan perintah : 
+	- $ scp calculate_matrix sister_13512064_2@167.205.32.47:calculate_matrix
+	- $ scp calculate_matrix sister_13512064_2@167.205.32.48:calculate_matrix 
+20. Memulai memulai menghitung hasil perkaliannya, dengan perintah : 
+	$ mpirun -np 64 --hostfile mpi_hostfile --bind-to core:overload-allowed calculate_matrix
+	PERHATIAN : 
+	- 64 adalah jumlah task yang ingin dibuat 
+21. Setiap kali pengujian untuk matrix ukuran berbeda, kita harus mengganti beberapa bagian , yaitu :
+	- Pada header calculate_matrix.c yang menyatakan nilai default untuk N. Kita harus sesuaikan sizenya dengan ukuran matrik yang akan dibaca.
+	- Pada saat pembacaan file yang berisi matrix juga harus diganti nama filenya secara manual menyesuaikan ukuran matrik dengan N yang telah kita tuliskan. Merubah melalui Git Bash bisa dilakukan dengan perintah : nano ~/calculate_matrix.c
+	- Jika Anda kesulitan, maka silahkan edit secara offline di komputer localhost kemudian upload file tersebut ke 167.205.32.46 dan dikompilasi disana.
+	- Setelah itu jangan lupa untuk mendistribusikan hasil kompilasi yang baru ke setiap hostfile.
+22. Jalankan program dengan  $ mpirun -np 64 --hostfile mpi_hostfile --bind-to core:overload-allowed calculate_matrix
+23. Jangan lupa logout.
